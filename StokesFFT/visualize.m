@@ -1,12 +1,13 @@
 clear;
 clc;
+close all;
 
 load("u.csv")
 load("v.csv")
 load("p.csv")
 load("x.csv")
 load("y.csv")
-load("u_acc.csv")
+%load("u_acc.csv")
 
 figure(1)
 contourf(x,y,u,50,'linestyle',"none")

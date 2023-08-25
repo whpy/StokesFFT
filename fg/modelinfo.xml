@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<modelInfo comsolVersion="5.6.0.280" entityComments="" modelType="MODEL" nodeType="solved" isRunnable="false" pdfResources="" passwordProtection="off" startMode="edit" ignoreLicenseErrors="off" title="" description="" runtimeProtection="off" windowTitle="Periodic 2d komo com56" expectedComputationTime="" lastComputationTime="26.405 s" mainPartSDim="None">
+  <historyInfo createdIn="COMSOL Multiphysics 5.6 (Build: 280)" author="" createdDate="1692680933005" lastModifiedBy="" lastModifiedDate="1692681420607"/>
+  <licenseInfo products="BATTERYDESIGN|CFD|CHEM|CORROSION|ELECTROCHEMISTRY|ELECTRODEPOSITION|FUELCELLANDELECTROLYZER|MICROFLUIDICS|POLYMERFLOW|POROUSMEDIAFLOW|SUBSURFACEFLOW"/>
+  <physicsInfo physics="Laminar_flow"/>
+  <geometryInfo>
+    <geom tag="geom1" dimension="2"/>
+  </geometryInfo>
+  <batchLicInfo batchLic=""/>
+  <appArgumentInfo/>
+</modelInfo>
+

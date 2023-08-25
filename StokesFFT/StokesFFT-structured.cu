@@ -9,10 +9,69 @@
 #include <complex>
 #include <cufft.h>
 #include <string>
+
 //#pragma comment ( lib, "cufft.lib" )
 #define BSZ 16 //block size
 #define M_PI		3.14159265358979323846
 using namespace std;
+
+__device__ __constant__ cufftComplex unitI = {0.0,1.0};
+
+__global__ void real2complex(float *f, cufftComplex *fc, int N) 
+  {          
+  int i = threadIdx.x + blockIdx.x*BSZ; 
+  int j = threadIdx.y + blockIdx.y*BSZ;  
+  int index = j*N+i;  
+  if (i<N && j<N)   
+  {      fc[index].x = f[index];     
+         fc[index].y = 0.0f; 
+   }  
+  }  
+
+__global__ void complex2real(cufftComplex *fc, float *f, int N)
+  {          
+  int i = threadIdx.x + blockIdx.x*BSZ;
+  int j = threadIdx.y + blockIdx.y*BSZ; 
+  int index = j*N+i;         
+  if (i<N && j<N)  
+  {   f[index] = fc[index].x/((float)N*(float)N); 
+      //divide by number of elements to recover value    
+  }
+  }
+
+
+__device__ cuComplex cuCcast(float a)
+{
+	cuComplex r;
+	r.x = a;
+	r.y = 0.0;
+	return r;
+}
+
+__device__ cuComplex operator+(cuComplex a, cuComplex b)
+{
+    cuComplex r;
+    r.x = a.x + b.x;
+    r.y = a.y + b.y;
+    return r;
+}
+
+__device__ cuComplex operator-(cuComplex a, cuComplex b)
+{
+    cuComplex r;
+    r.x = a.x - b.x;
+    r.y = a.y - b.y;
+    return r;
+}
+
+__device__ cuComplex operator*(cuComplex a, cuComplex b)
+{
+    cuComplex r;
+    r.x = a.x*b.x - a.y*b.y;
+	r.y = a.y*b.x + a.x*b.y;
+    return r;
+}
+
 
 __global__ void cal_divergence(cufftComplex *fxt, cufftComplex *fyt, cufftComplex *dft, 
 								float *k, int N)
@@ -24,8 +83,10 @@ __global__ void cal_divergence(cufftComplex *fxt, cufftComplex *fyt, cufftComple
 	if(i<N && j<N)
 	{ 
 	  //float k2 = k[i]*k[i]+k[j]*k[j];
-	  dft[index].x = -(k[i]*fxt[index].y + k[j]*fyt[index].y);
-	  dft[index].y = (k[i]*fxt[index].x + k[j]*fyt[index].x);
+	  // i*kx*fxt+i*ky*fyt
+	  dft[index] = unitI*cuCcast((k[i]))*fxt[index] + unitI*cuCcast(k[j])*fyt[index];
+	//   dft[index].x = -(k[i]*fxt[index].y + k[j]*fyt[index].y);
+	//   dft[index].y = (k[i]*fxt[index].x + k[j]*fyt[index].x);
 	}
 }
 
@@ -35,12 +96,14 @@ __global__ void cal_grad(cufftComplex *pt, cufftComplex *pt_gradx, cufftComplex 
     int j = threadIdx.y + blockIdx.y*BSZ; 
 	int index = j*N+i; 
 	if (i<N && j<N)
-	{               
-	  pt_gradx[index].x = -1*pt[index].y*k[i];
-	  pt_gradx[index].y = pt[index].x*k[i];
-
-	  pt_grady[index].x = -1*pt[index].y*k[j];
-	  pt_grady[index].y = pt[index].x*k[j];
+	{
+		//i*kx*pt
+		pt_gradx[index] = pt[index]*cuCcast(k[i]);         
+	//   pt_gradx[index].x = -1*pt[index].y*k[i];
+	//   pt_gradx[index].y = pt[index].x*k[i];
+		pt_grady[index] = pt[index]*cuCcast(k[j]);
+	//   pt_grady[index].x = -1*pt[index].y*k[j];
+	//   pt_grady[index].y = pt[index].x*k[j];
 	}
 }
 
@@ -72,36 +135,7 @@ __global__ void solve_velocity(cufftComplex *f, cufftComplex *pt_grad, cufftComp
 	}
 }
 
-__global__ void real2complex(float *f, cufftComplex *fc, int N) 
-  {          
-  int i = threadIdx.x + blockIdx.x*BSZ; 
-  int j = threadIdx.y + blockIdx.y*BSZ;  
-  int index = j*N+i;  
-  if (i<N && j<N)   
-  {      fc[index].x = f[index];     
-         fc[index].y = 0.0f; 
-   }  
-  }  
 
-__global__ void complex2real(cufftComplex *fc, float *f, int N)
-  {          
-  int i = threadIdx.x + blockIdx.x*BSZ;
-  int j = threadIdx.y + blockIdx.y*BSZ; 
-  int index = j*N+i;         
-  if (i<N && j<N)  
-  {   f[index] = fc[index].x/((float)N*(float)N); 
-      //divide by number of elements to recover value    
-  }
-  }
-
-__device__ cuComplex csub()
-{
-
-}
-
-__device__ void cplus();
-
-__device__ void cmul();
 
 /******************************* MAIN ***************************************/
 int main(int argc, char** argv) 
@@ -142,9 +176,9 @@ int main(int argc, char** argv)
        r2 = (x[N*j+i]-0.5)*(x[N*j+i]-0.5) + (y[N*j+i]-0.5)*(y[N*j+i]-0.5);  //define r^2
 	   //fx[N*j+i] = exp(-r2/(2*s2)); //define f at right hand side 
 	   
-	   fx[N*j+i] = sin(4*(ymin + j*h));
+	   fx[N*j+i] = 0;
 	   u_acc[N*j+i] = 1/(4*4)*sin(4*(ymin + j*h));
-	   fy[N*j+i] = 0.0;   
+	   fy[N*j+i] = sin(2*(xmin + i*h + ymin + j*h));   
 	 }        
 	}
 
@@ -229,28 +263,28 @@ int main(int argc, char** argv)
 	complex2real<<<dimGrid, dimBlock>>>(u_dc, u_d, N);
 	cudaMemcpy(u, u_d, sizeof(float)*N*N, cudaMemcpyDeviceToHost); 
 	float constant = u[0]; 
-	for (int i=0; i<N*N; i++)
-	{       
-	   u[i] -= constant; //substract u[0] to force the arbitrary constant to be 0
-	}
+	// for (int i=0; i<N*N; i++)
+	// {       
+	//    u[i] -= constant; //substract u[0] to force the arbitrary constant to be 0
+	// }
 
 	cufftExecC2C(plan, vt_d, v_dc, CUFFT_INVERSE);
 	complex2real<<<dimGrid, dimBlock>>>(v_dc, v_d, N);
 	cudaMemcpy(v, v_d, sizeof(float)*N*N, cudaMemcpyDeviceToHost); 
 	constant = v[0]; 
-	for (int i=0; i<N*N; i++)
-	{       
-	   v[i] -= constant; //substract u[0] to force the arbitrary constant to be 0
-	}
+	// for (int i=0; i<N*N; i++)
+	// {       
+	//    v[i] -= constant; //substract u[0] to force the arbitrary constant to be 0
+	// }
 
 	cufftExecC2C(plan, pt_d, p_dc, CUFFT_INVERSE);
 	complex2real<<<dimGrid, dimBlock>>>(p_dc, p_d, N);
 	cudaMemcpy(p, p_d, sizeof(float)*N*N, cudaMemcpyDeviceToHost); 
-	constant = p[0]; 
-	for (int i=0; i<N*N; i++)
-	{       
-	   p[i] -= constant; //substract u[0] to force the arbitrary constant to be 0
-	}
+	// constant = p[0]; 
+	// for (int i=0; i<N*N; i++)
+	// {       
+	//    p[i] -= constant; //substract u[0] to force the arbitrary constant to be 0
+	// }
 
 	
 	// cufftExecC2C(plan, f_dc, ft_d, CUFFT_FORWARD);
