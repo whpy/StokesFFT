@@ -11,5 +11,6 @@ you would get a exe named SFFT then input
 ```
 ./SFFT 256
 ```
-then the programme would calculate the Stokes equation in 2D periodic(four sides).
+then the programme would calculate the Stokes equation in 2D periodic(four sides) with 256 grid points in both directions(x, y).
+The programme would automatically generate the .csv files(u.csv, v.csv) to record the result, which could be visualized by matlab using the visualize.m file
 
